@@ -1,0 +1,55 @@
+{
+  "_comment": "ip-rotator v3.1.0 CONTAINER config (run.sh mounts this over /app/config.json). Frontends bind 0.0.0.0 so rootless podman can publish the ports (works since the B37 fix); wg configs dir + wireproxy binary pinned to in-container paths. static_proxies = your 10 Webshare proxies (verified 10/10 live, credentials preserved). Edit freely - no rebuild needed. Full field docs: app/docs/07-config.md",
+  "listen_host": "0.0.0.0",
+  "listen_port": 8000,
+  "enable_socks": true,
+  "socks_listen_host": "0.0.0.0",
+  "socks_listen_port": 1080,
+
+  "interval": 10.0,
+  "no_reuse_seconds": 2700,
+  "policy_on_exhaustion": "recycle",
+  "allow_direct": false,
+  "allow_plain_http": false,
+
+  "state_path": "/root/.ip_rotator/state.db",
+
+  "enable_warp": true,
+  "warp_accounts": 3,
+  "wireproxy_bin": "/usr/local/bin/wireproxy",
+  "warp_proxy_port": 40000,
+  "wg_configs_dir": "/root/.ip_rotator/wg-configs",
+
+  "enable_warpplus": false,
+  "warpplus_instances": 4,
+  "warpplus_mode": "auto",
+
+  "enable_v2ray": false,
+  "v2ray_max_nodes": 240,
+
+  "enable_psiphon": false,
+  "enable_vpngate": false,
+  "enable_windscribe_proxy": false,
+
+  "static_proxies": [
+    "31.59.20.176:6754:awrtyene:rhd2m4j6tact",
+    "45.38.107.97:6014:awrtyene:rhd2m4j6tact",
+    "198.105.121.200:6462:awrtyene:rhd2m4j6tact",
+    "64.137.96.74:6641:awrtyene:rhd2m4j6tact",
+    "198.23.243.226:6361:awrtyene:rhd2m4j6tact",
+    "38.154.185.97:6370:awrtyene:rhd2m4j6tact",
+    "84.247.60.125:6095:awrtyene:rhd2m4j6tact",
+    "142.111.67.146:5611:awrtyene:rhd2m4j6tact",
+    "191.96.254.138:6185:awrtyene:rhd2m4j6tact",
+    "31.58.9.4:6077:awrtyene:rhd2m4j6tact"
+  ],
+  "webshare_api_key": "",
+  "api_keys": {
+    "zenrows": "",
+    "scrapingbee": "",
+    "crawlbase": "",
+    "scraperapi": ""
+  },
+
+  "log_level": "INFO"
+}

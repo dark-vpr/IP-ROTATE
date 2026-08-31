@@ -1,0 +1,11 @@
+# Build-context exclusions (podman respects .containerignore next to Containerfile)
+# Keeps the image free of host-only junk.
+**/__pycache__
+**/*.pyc
+**/.pytest_cache
+app/.venv
+app/.git
+app/LIVE_DEMO*.log
+data
+*.zip
+.git
