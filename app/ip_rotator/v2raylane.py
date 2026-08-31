@@ -503,12 +503,11 @@ class V2RayLane:
         errfile = os.path.join(self.cfg.v2ray_state_dir(),
                                f"singbox_{self._port_set}.stderr")
         try:
-            errfh = open(errfile, "w")
-            proc = subprocess.Popen(
-                [self._bin, "run", "-c", conf],
-                stdout=subprocess.DEVNULL, stderr=errfh,
-                preexec_fn=self._pdeathsig)
-            errfh.close()
+            with open(errfile, "w") as errfh:
+                proc = subprocess.Popen(
+                    [self._bin, "run", "-c", conf],
+                    stdout=subprocess.DEVNULL, stderr=errfh,
+                    preexec_fn=self._pdeathsig)
         except Exception as e:
             self.log.warning(f"v2ray lane: sing-box spawn failed: {e}")
             self._port_set ^= 1
