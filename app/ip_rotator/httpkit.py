@@ -9,6 +9,8 @@ DETERMINISTIC:
     measure the upstream we chose, never an accidental env-proxy chain
     (classic "validator lies about the egress IP" bug).
   * verify=True (default) -> certificate failures = MITM signature.
+  * http2="auto" -> enables HTTP/2 negotiation when target supports it
+    (modern standard for performance, reduces latency, header compression).
 """
 import json
 import socket
@@ -30,6 +32,7 @@ def http_client() -> httpx.Client:
             verify=True,
             follow_redirects=False,
             trust_env=False,
+            http2=True,  # Enable HTTP/2 support for modern targets
             limits=httpx.Limits(max_connections=128,
                                 max_keepalive_connections=24),
         )

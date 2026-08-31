@@ -185,20 +185,21 @@ def parse_wg_quick(path: str) -> dict:
     (SaveConfig, Table, PostUp, fwmark...) are ignored safely."""
     iface, peer = {}, {}
     section = None
-    for line in open(path, "r", encoding="utf-8", errors="replace"):
-        line = line.strip()
-        if not line or line.startswith("#"):
-            continue
-        if line.startswith("["):
-            section = line.lower().strip("[]")
-            continue
-        if "=" not in line:
-            continue
-        k, _, v = line.partition("=")
-        k, v = k.strip(), v.strip()
-        tgt = iface if section == "interface" else peer if section == "peer" else None
-        if tgt is not None:
-            tgt[k] = v
+    with open(path, "r", encoding="utf-8", errors="replace") as f:
+        for line in f:
+            line = line.strip()
+            if not line or line.startswith("#"):
+                continue
+            if line.startswith("["):
+                section = line.lower().strip("[]")
+                continue
+            if "=" not in line:
+                continue
+            k, _, v = line.partition("=")
+            k, v = k.strip(), v.strip()
+            tgt = iface if section == "interface" else peer if section == "peer" else None
+            if tgt is not None:
+                tgt[k] = v
     if not iface.get("PrivateKey") or not peer.get("PublicKey"):
         raise ValueError(f"{path}: missing PrivateKey/PublicKey")
     return {
