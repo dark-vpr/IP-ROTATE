@@ -1,27 +1,20 @@
 [project]
 name = "ip-rotator"
-version = "3.2.0"
-description = "Production-grade IP-rotation gateway with HTTP/2 support, massive IP diversity (WARP+, v2ray), strict no-reuse windows, and zero-fail architecture for high-throughput scraping."
-readme = "README.md"
-requires-python = ">=3.9"
-license = { text = "MIT" }
-authors = [{ name = "ip-rotator" }]
-keywords = ["proxy", "socks5", "rotation", "scraping", "burp", "burpsuite", "http2", "warp", "v2ray"]
+version = "4.0.0"
+description = "Ultimate IP Rotator with God Mode WAF Bypass"
+requires-python = ">=3.12"
 dependencies = [
-    "httpx[http2,socks]>=0.27",  # HTTP/2 + SOCKS support for modern targets
-    "python-socks>=2.4",         # battle-tested SOCKS4/4a/5 client
-    "rich>=13.7",                # terminal output for CLI
-    "aiohttp>=3.9.0",            # async HTTP for high-concurrency scenarios
-    "async-timeout>=4.0.0",      # timeout management for async operations
+    "httpx[http2]>=0.28.0",
+    "aiohttp>=3.11.0",
+    "curl-cffi>=0.9.0",
+    "playwright>=1.49.0",
+    "playwright-stealth>=1.0.0",
+    "rich>=14.0.0",
+    "pytest>=8.3.0",
+    "websockets>=14.0",
+    "pysocks>=1.7.1",
+    "cryptography>=44.0.0",
 ]
-
-[dependency-groups]
-dev = [
-    "pytest>=8.0",             # test suite: uv sync installs it; run via `uv run pytest tests/ -q`
-]
-
-[project.scripts]
-ip-rotator = "ip_rotator.cli:main"
 
 [build-system]
 requires = ["hatchling"]
@@ -30,6 +23,5 @@ build-backend = "hatchling.build"
 [tool.hatch.build.targets.wheel]
 packages = ["ip_rotator"]
 
-[tool.uv]
-# `uv sync` / `uv run` workflow is the primary supported way to run this tool
-package = true
+[project.scripts]
+ip-rotator = "ip_rotator.cli:main"

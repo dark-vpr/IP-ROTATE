@@ -8,42 +8,57 @@ __pycache__/
 env/
 venv/
 .venv/
-.ENV
-.python-version
-
-# Dependencies
-uv.lock
-poetry.lock
-Pipfile.lock
-requirements.txt.bak
-
-# Build artifacts
-build/
-dist/
-*.egg-info/
+pip-log.txt
+pip-delete-this-directory.txt
+.tox/
+.coverage
+.coverage.*
+.cache
+nosetests.xml
+coverage.xml
+*.cover
+*.log
+.DS_Store
+Thumbs.db
 
 # Testing
 .pytest_cache/
-.coverage
-htmlcov/
-coverage/
+.hypothesis/
 
-# Logs
-*.log
+# Distribution / packaging
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+MANIFEST
+
+# IDEs
+.vscode/
+.idea/
 
 # Environment
 .env
 .env.local
-.env.*
-.envrc
+*.env.*
 
-# Editors
-.vscode/
-.idea/
-*.swp
-*.swo
-
-# OS
+# OS generated files
 .DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
 Thumbs.db
 ```
