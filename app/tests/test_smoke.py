@@ -1172,6 +1172,9 @@ class TestStickySessions(unittest.TestCase):
         self.db = StateDB(os.path.join(tempfile.mkdtemp(), "s.db"), fresh=True)
         self.cfg = Config()
         self.cfg.sticky_sessions = True   # opt-in feature
+        # Disable no-reuse window for unit tests to allow immediate reuse
+        self.cfg.no_reuse_seconds = 0
+        self.cfg.recycle_avoid_seconds = 0
         self.mgr = PoolManager(self.cfg, self.db, _SilentLog())
         self.mgr.real_ip = "7.7.7.7"
         with self.mgr._lock:

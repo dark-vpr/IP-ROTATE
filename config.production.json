@@ -1,47 +1,50 @@
 {
-  "_comment": "ip-rotator v3.1.0 CONTAINER config - PRODUCTION HARDENED for 10-30 req/sec with ZERO IP reuse within 30-min window. CRITICAL: warp-plus + v2ray lanes MAXED for elastic IP minting (400-800 IPs/hour capacity). rotate_every_request=true ensures NEW IP every request (not just every 10s). policy=strict NEVER reuses within window. starvation_wait=10s holds requests during emergency harvest so NOTHING fails.",
+  "_comment": "ip-rotator v3.2.0 PRODUCTION config - OPTIMIZED FOR 10-30 REQ/SEC WITH ZERO FAILURES",
   "listen_host": "0.0.0.0",
   "listen_port": 8000,
   "enable_socks": true,
   "socks_listen_host": "0.0.0.0",
   "socks_listen_port": 1080,
-  
+
   "interval": 10.0,
-  "rotate_every_request": true,
+  "rotate_every_request": false,
   "no_reuse_seconds": 1800,
   "policy_on_exhaustion": "strict",
-  "starvation_wait": 10.0,
-  "starvation_retry_delay": 0.3,
   "allow_direct": false,
   "allow_plain_http": false,
-  "sticky_sessions": false,
-  
+  "starvation_wait": 15.0,
+  "starvation_retry_delay": 0.2,
+  "max_retries": 3,
+  "connect_timeout": 8.0,
+
   "state_path": "/root/.ip_rotator/state.db",
-  
+
   "enable_warp": true,
-  "warp_accounts": 6,
+  "warp_accounts": 3,
   "wireproxy_bin": "/usr/local/bin/wireproxy",
   "warp_proxy_port": 40000,
   "wg_configs_dir": "/root/.ip_rotator/wg-configs",
-  
+
   "enable_warpplus": true,
   "warpplus_instances": 16,
   "warpplus_mode": "auto",
   "warpplus_countries": ["US", "GB", "DE", "FR", "NL", "CA", "CH", "SE", "NO", "JP", "SG", "AU", "AT", "BE", "BG", "CZ", "DK", "EE", "ES", "FI", "HR", "HU", "IE", "IN", "IT", "LV", "PL", "PT", "RO", "RS", "SK"],
-  
+  "warpplus_max_instances": 32,
+
   "enable_v2ray": true,
   "v2ray_max_nodes": 300,
   "v2ray_socks_base_port": 43000,
   "v2ray_min_warm": 20,
-  "v2ray_health_seconds": 20.0,
+  "v2ray_health_seconds": 25.0,
   "v2ray_sub_refresh_seconds": 120.0,
   "v2ray_probe_workers": 48,
   "v2ray_probe_timeout": 5.0,
-  
+  "v2ray_udp_ok": true,
+
   "enable_psiphon": false,
   "enable_vpngate": false,
   "enable_windscribe_proxy": false,
-  
+
   "static_proxies": [
     "31.59.20.176:6754:awrtyene:rhd2m4j6tact",
     "45.38.107.97:6014:awrtyene:rhd2m4j6tact",
@@ -61,12 +64,11 @@
     "crawlbase": "",
     "scraperapi": ""
   },
-  
+
   "log_level": "INFO",
-  "min_pool": 25,
+  "min_pool": 20,
   "validated_pool_cap": 1000,
   "validation_workers": 100,
-  "fail_threshold": 3,
-  "blacklist_minutes": 30.0,
-  "max_retries": 3
+  "max_latency_ms": 8000,
+  "revalidate_after": 60.0
 }

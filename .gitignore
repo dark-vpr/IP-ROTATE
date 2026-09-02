@@ -1,27 +1,49 @@
 ```
-# Python compiled files
-*.pyc
+# Python
 __pycache__/
+*.pyc
+*.pyo
+*.pyd
+.Python
+env/
+venv/
+.venv/
+.ENV
+.python-version
 
-# Logs and temp files
+# Dependencies
+uv.lock
+poetry.lock
+Pipfile.lock
+requirements.txt.bak
+
+# Build artifacts
+build/
+dist/
+*.egg-info/
+
+# Testing
+.pytest_cache/
+.coverage
+htmlcov/
+coverage/
+
+# Logs
 *.log
-*.tmp
-*.swp
 
-# Environment files
+# Environment
 .env
 .env.local
-*.env.*
+.env.*
+.envrc
 
 # Editors
 .vscode/
 .idea/
+*.swp
+*.swo
 
-# Coverage reports
-coverage/
-htmlcov/
-.coverage
-
-# Test cache
-.pytest_cache/
+# OS
+.DS_Store
+Thumbs.db
 ```

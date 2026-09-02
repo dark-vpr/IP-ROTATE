@@ -917,32 +917,44 @@ class PoolManager:
             return
         with self._sticky_lock:
             self._sticky[host] = (up.label, time.time() + self.cfg.sticky_ttl)
+    
+    def _sticky_clear(self, host: str) -> None:
+        """Clear sticky session for a host."""
+        with self._sticky_lock:
+            self._sticky.pop(host, None)
 
     def _next_upstream_once(self, exclude: List[Upstream],
                             host: str = "") -> Optional[Upstream]:
-        """Current/sticky/fresh upstream, else starvation policy result."""
+        """Current/sticky/fresh upstream, else starvation policy result.
+        
+        CRITICAL: Never return an IP that violates the no-reuse window.
+        Return None to trigger queuing/waiting mechanism instead.
+        """
         excl_ips = {u.egress_ip for u in exclude if u.egress_ip}
         sticky = self._sticky_get(host, excl_ips)
         if sticky is not None:
-            return sticky
+            # Verify sticky IP still respects no-reuse window
+            if self._ip_available_locked(sticky.egress_ip):
+                return sticky
+            # Sticky IP is in cooldown - clear it and find fresh one
+            self._sticky_clear(host)
         with self._lock:
             cur = self._current
             if cur is not None and cur.egress_ip not in excl_ips and \
                     not self.state.is_blacklisted(cur.host, cur.port, cur.kind):
-                self._sticky_set(host, cur)
-                return cur
+                # Only return current if it respects no-reuse window
+                if self._ip_available_locked(cur.egress_ip):
+                    self._sticky_set(host, cur)
+                    return cur
+                # Current IP is in cooldown - must rotate
+                self.log.warning(f"current IP {cur.egress_ip} in cooldown, forcing rotation")
             fresh = self._pick_fresh_locked(excl_ips)
             if fresh is not None:
                 self._activate(fresh, "failover-fresh")
                 self._sticky_set(host, fresh)
                 return fresh
-        # mid-request failover couldn't find fresh -> starvation policies
-        self._handle_starvation("request-failover")
-        with self._lock:
-            cur = self._current
-            if cur is not None and cur.egress_ip not in excl_ips:
-                self._sticky_set(host, cur)
-                return cur
+        # NO fallback to current if it violates no-reuse window
+        # Return None to trigger survival window waiting
         return None
 
     def next_upstream(self, exclude: List[Upstream],
