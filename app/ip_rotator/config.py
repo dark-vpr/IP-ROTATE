@@ -203,8 +203,8 @@ class Config:
     singbox_bin: str = ""              # "" = auto: PATH, then tools dir, then
                                        # download from singbox_download
     singbox_download: str = "https://github.com/SagerNet/sing-box/" \
-                           "releases/download/v1.13.19/" \
-                           "sing-box-1.13.19-linux-amd64.tar.gz"
+                           "releases/download/v1.14.0/" \
+                           "sing-box-1.14.0-linux-amd64.tar.gz"
     v2ray_socks_base_port: int = 43000
     v2ray_max_nodes: int = 240         # max outbounds per sing-box process
     v2ray_min_warm: int = 8            # regen config when healthy < this
@@ -216,6 +216,22 @@ class Config:
         "vless", "vmess", "trojan", "ss", "hysteria2"])  # parsed protocols
     v2ray_udp_ok: bool = False         # set true on networks with UDP egress
                                        # (enables hysteria2/quic nodes)
+
+    # --- sing-box WARP lane (v4): Cloudflare WARP via sing-box v1.14+ --------
+    # This is the ACTUAL engine behind Oblivion Desktop (not warp-plus).
+    # Unlike warp-plus v1.2.6 which has a hardcoded bug (HTTP probe to
+    # 1.1.1.1:80 with 500ms timeout causing 10s delays), sing-box has NO
+    # hardcoded probes and starts cleanly. TCP-based WireGuard handshake
+    # works where raw UDP is blocked. Each instance = one WARP identity =
+    # one SOCKS5 port. Fresh identity mint = new Cloudflare egress IP.
+    enable_singwarp: bool = True
+    singwarp_instances: int = 8        # warm SOCKS ports (each own WARP identity)
+    singwarp_socks_base_port: int = 45000
+    singwarp_socks_username: str = ""  # optional auth on local SOCKS
+    singwarp_socks_password: str = ""
+    singwarp_handshake_grace: float = 15.0  # grace for WireGuard handshake
+    singwarp_probe_timeout: float = 15.0
+    singbox_bin: str = ""              # shared with v2ray lane (same binary)
 
     # --- metered free tiers (Webshare / scraping APIs) ------------------------
     # Webshare free: 10 datacenter proxies, 1GB/month, forever, NO CARD.
@@ -263,6 +279,10 @@ class Config:
     def v2ray_state_dir(self) -> str:
         base = os.path.dirname(os.path.abspath(self.state_path))
         return os.path.join(base, "v2ray")
+
+    def singwarp_state_dir(self) -> str:
+        base = os.path.dirname(os.path.abspath(self.state_path))
+        return os.path.join(base, "singwarp")
 
     def validate(self) -> None:
         if self.interval < 1:

@@ -1,26 +1,46 @@
-```gitignore
-# Python cache files
+```
+# Python
 __pycache__/
 *.pyc
 *.pyo
 *.pyd
+.Python
+env/
+venv/
+.venv/
+.ENV
+.ENV.local
+.env
+.env.local
+.env.
+*.env.*
+*.env.local.*
 
-# Test cache
+# Testing
 .pytest_cache/
 .coverage
 coverage/
+htmlcov/
 
-# Virtual environments
-venv/
-.venv/
-env/
-ENV/
+# Build/dist
+build/
+dist/
+*.egg
+*.egg-info/
+*.so
+*.whl
 
-# Dependencies
-pip-wheel-metadata/
-.wheelhouse/
-.installed.cfg
+# Logs
+*.log
 
-# Local configuration
-.wslconfig
+# OS
+.DS_Store
+Thumbs.db
+
+# Editors
+.vscode/
+.idea/
+*.swp
+*.swo
+*.tmp
 ```
