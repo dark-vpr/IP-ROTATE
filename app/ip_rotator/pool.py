@@ -43,6 +43,7 @@ from .state import StateDB
 from .v2raylane import V2RayLane
 from .warpwire import WarpPlusLane, WireGuardLane
 from .singwarp import SingboxWarpLane
+from .waf_validator import SyncWAFValidator, WAF_TARGETS, WFATarget
 
 
 def _proto_for_source(url: str) -> str:
@@ -145,6 +146,17 @@ class PoolManager:
         self.warpplus = WarpPlusLane(cfg, log, state)
         self.v2ray = V2RayLane(cfg, log, state)
         self.singwarp = SingboxWarpLane(cfg, log, state)
+        
+        # WAF validation engine (v5): multi-vendor consensus + blacklist filtering
+        self.waf_validator: Optional[SyncWAFValidator] = None
+        if cfg.enable_waf_validation:
+            custom_targets = self._load_custom_waf_targets()
+            self.waf_validator = SyncWAFValidator(cfg, log, custom_targets)
+            self.waf_validator.refresh_blacklist(force=True)
+            self.log.warning(
+                f"WAF validation engine enabled: {len(self.waf_validator.validator.targets)} targets, "
+                f"consensus={cfg.waf_required_consensus:.0%}, min vendors={cfg.waf_min_vendor_coverage}")
+        
         self._warp_checked = False
         self._webshare_next_refresh = 0.0
         self._api_bytes_lock = threading.Lock()
@@ -226,10 +238,54 @@ class PoolManager:
         self.warpplus.stop()
         self.v2ray.stop()
         self.singwarp.stop()
+        if self.waf_validator:
+            self.waf_validator.close()
         try:
             self._flush_api_bytes()
         except Exception:
             pass
+    
+    def _load_custom_waf_targets(self) -> Optional[List[WFATarget]]:
+        """Load custom WAF targets from config.validation.json."""
+        if not self.cfg.waf_validation_config:
+            return None
+        
+        import os
+        if not os.path.exists(self.cfg.waf_validation_config):
+            self.log.info(f"WAF validation config not found: {self.cfg.waf_validation_config}")
+            return None
+        
+        try:
+            with open(self.cfg.waf_validation_config, 'r') as f:
+                data = json.load(f)
+            
+            custom_targets = []
+            for t in data.get('custom_targets', []):
+                target = WFATarget(
+                    name=t.get('name', 'custom'),
+                    url=t.get('url', ''),
+                    vendor=t.get('vendor', 'Custom'),
+                    expected_status=t.get('expected_status', 200),
+                    keywords=t.get('keywords', []),
+                    anti_keywords=t.get('anti_keywords', []),
+                    min_content_length=t.get('min_content_length', 1000),
+                    timeout=t.get('timeout', 5.0)
+                )
+                custom_targets.append(target)
+            
+            # Check if we should override built-in targets
+            if data.get('built_in_targets_override', {}).get('enabled', False):
+                return custom_targets if custom_targets else None
+            
+            # Merge with built-in targets
+            if custom_targets:
+                return WAF_TARGETS + custom_targets
+            
+            return WAF_TARGETS if not self.cfg.waf_custom_targets_only else None
+            
+        except Exception as e:
+            self.log.warning(f"Failed to load WAF validation config: {e}")
+            return WAF_TARGETS
 
     def _detect_real_ip(self):
         try:
@@ -626,6 +682,43 @@ class PoolManager:
                 self.stats["transparent_rejected"] += 1
                 self.state.record_fail(host, port, proto, 3600.0, force=True)
                 return
+            
+            # WAF validation engine (v5): multi-vendor consensus + blacklist check
+            if self.cfg.enable_waf_validation and self.waf_validator:
+                # Check IP against blacklist cache
+                if self.waf_validator.is_blacklisted(ip):
+                    self.stats["blacklisted"] += 1
+                    self.state.record_fail(host, port, proto, 3600.0, force=True)
+                    self.log.debug(f"BLACKLISTED (Firehol/AbuseIPDB): {ip} - {key}")
+                    return
+                
+                # Full WAF validation (only for fresh validations, not revalidations)
+                if not is_reval:
+                    result = self.waf_validator.validate_proxy_sync(
+                        up, ip, ms, required_consensus=self.cfg.waf_required_consensus
+                    )
+                    
+                    if not result.is_valid:
+                        reason = "consensus"
+                        if result.blacklist_hits:
+                            reason = "blacklist"
+                            self.stats["blacklisted"] += 1
+                        elif result.soft_blocks:
+                            reason = f"soft_block ({', '.join(result.soft_blocks)})"
+                        
+                        self.log.debug(
+                            f"WAF validation FAILED: {key} - {reason} "
+                            f"(success={result.success_count}/{result.total_targets}, "
+                            f"vendors={result.vendor_coverage})"
+                        )
+                        return
+                    
+                    self.log.debug(
+                        f"WAF validation PASSED: {key} - "
+                        f"egress={ip} success={result.success_count}/{result.total_targets} "
+                        f"vendors={list(result.vendor_coverage.keys())}"
+                    )
+            
             if self.cfg.country_filter:
                 country = self._geo(ip)
                 if country not in {c.upper() for c in self.cfg.country_filter}:

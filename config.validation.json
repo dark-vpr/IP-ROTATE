@@ -1,0 +1,46 @@
+{
+  "_comment": "Custom WAF Validation Targets Configuration",
+  "_description": "Define your own test URLs with expected responses. These are used IN ADDITION to the built-in gold standard targets.",
+  
+  "custom_targets": [
+    {
+      "name": "my-custom-target",
+      "url": "https://example.com/api/health",
+      "vendor": "Custom",
+      "expected_status": 200,
+      "keywords": ["success", "ok"],
+      "anti_keywords": ["error", "blocked", "captcha"],
+      "min_content_length": 50,
+      "timeout": 5.0
+    },
+    {
+      "name": "api-gateway",
+      "url": "https://api.myservice.com/status",
+      "vendor": "Cloudflare",
+      "expected_status": 200,
+      "keywords": ["operational"],
+      "anti_keywords": ["down", "maintenance"],
+      "min_content_length": 100,
+      "timeout": 3.0
+    }
+  ],
+  
+  "validation_settings": {
+    "required_consensus_rate": 0.6,
+    "refresh_blacklist_interval_minutes": 60,
+    "max_concurrent_validations": 10,
+    "enable_soft_block_detection": true,
+    "enable_keyword_validation": true,
+    "min_vendor_coverage": 2
+  },
+  
+  "blacklist_sources": [
+    "https://raw.githubusercontent.com/firehol/blocklist-ipsets/master/firehol_level1.netset",
+    "https://raw.githubusercontent.com/stamparm/ipsum/master/levels/2.txt"
+  ],
+  
+  "built_in_targets_override": {
+    "_comment": "Set to true to disable built-in targets and use ONLY custom targets",
+    "enabled": false
+  }
+}

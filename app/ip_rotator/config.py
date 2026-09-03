@@ -234,6 +234,18 @@ class Config:
     singwarp_gool_mode: bool = False   # enable double-hop (WARP-in-WARP) like Oblivion's 'gool' method
     singwarp_upstream_base_port: int = 46000  # base port for first-hop upstream SOCKS in gool mode
     singbox_bin: str = ""              # shared with v2ray lane (same binary)
+    
+    # --- WAF validation engine (v5): Multi-vendor consensus -------------------
+    # Gold standard validation: tests proxies against 7+ WAF-protected targets
+    # from different vendors (Cloudflare, AWS, Akamai) simultaneously. Filters
+    # blacklisted IPs using Firehol Level 1 + AbuseIPDB. Detects soft blocks
+    # (CAPTCHA/challenge pages). Requires 60% consensus rate across vendors.
+    enable_waf_validation: bool = True
+    waf_required_consensus: float = 0.6  # minimum success rate (0.0-1.0)
+    waf_blacklist_refresh_minutes: int = 60
+    waf_min_vendor_coverage: int = 2     # must pass at least N different vendors
+    waf_validation_config: str = "config.validation.json"  # custom targets file
+    waf_custom_targets_only: bool = False  # if true, ignore built-in targets
 
     # --- metered free tiers (Webshare / scraping APIs) ------------------------
     # Webshare free: 10 datacenter proxies, 1GB/month, forever, NO CARD.
