@@ -1,69 +1,26 @@
-```
-# System files
-.wslconfig
-
-# Logs and temp files
-*.log
-*.tmp
-
-# Environment
-.env
-.env.local
-*.env.*
-
-# Editors
-.vscode/
-.idea/
-
-# Python
+```gitignore
+# Python cache files
 __pycache__/
 *.pyc
 *.pyo
 *.pyd
-.Python
-env/
+
+# Test cache
+.pytest_cache/
+.coverage
+coverage/
+
+# Virtual environments
 venv/
 .venv/
-.ENV
-.python-version
-pip-log.txt
-pip-delete-this-directory.txt
-.tox/
-.coverage
-.coverage.*
-.cache
-nosetests.xml
-coverage.xml
-*.cover
-*.log
-.git/
-.mypy_cache/
-.pytest_cache/
-.hypothesis/
-.DS_Store
-Thumbs.db
+env/
+ENV/
 
-# Node.js
-node_modules/
-npm-debug.log*
-yarn-debug.log*
-yarn-error.log*
-lerna-debug.log*
+# Dependencies
+pip-wheel-metadata/
+.wheelhouse/
+.installed.cfg
 
-# Build outputs
-dist/
-build/
-target/
-*.min.js
-*.min.css
-
-# OS generated files
-.DS_Store
-.DS_Store?
-._*
-.Spotlight-V100
-.Trashes
-ehthumbs.db
-Thumbs.db
-Thumbs.db:encryptable
+# Local configuration
+.wslconfig
 ```
