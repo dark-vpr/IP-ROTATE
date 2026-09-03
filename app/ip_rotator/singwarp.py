@@ -136,66 +136,26 @@ def register_warp_account(timeout: float = 20.0) -> dict:
     }
 
 
-def singbox_warp_config(
-    acct: dict,
+def singbox_warp_config_gool(
+    outer_acct: dict,
+    inner_acct: dict,
     socks_port: int,
-    listen_host: str = "127.0.0.1",
+    listen_host: str = "0.0.0.0",
     username: str = "",
-    password: str = "",
-    gool_mode: bool = False,
-    upstream_socks: str = ""
+    password: str = ""
 ) -> dict:
-    """Build sing-box v1.14+ config for one WARP identity.
+    """Build sing-box config EXACTLY matching user's warp-pro script.
     
-    Supports:
-      * Single-hop: Direct WireGuard -> Internet
-      * Double-hop (Gool): SOCKS upstream -> WireGuard Hop1 -> detour -> 
-        WireGuard Hop2 -> Internet (WARP-in-WARP)
+    This uses the OUTBOUNDS style (not endpoints) with detour chaining,
+    which is the verified working format from the user's bash script.
     
-    Key changes from old wireproxy/warp-plus configs:
-      * WireGuard moved from outbounds to root-level `endpoints` block.
-      * Peer details inside `peers: [...]` array under endpoint.
-      * SOCKS inbound with optional auth at top level.
-      * Gool mode uses 'detour' field to chain WireGuard endpoints.
+    Structure:
+      - warp-inner: Second hop (detours via warp-outer)
+      - warp-outer: First hop with anti-DPI noise
     """
     auth = {}
     if username:
         auth = {"username": username, "password": password}
-    
-    v6_addr = f"{acct['v6']}/128" if acct.get("v6") else None
-    
-    # Build WireGuard endpoint config
-    wg_endpoint = {
-        "type": "wireguard",
-        "tag": "warp-egress",
-        "address": [acct["v4"] + "/32"] + ([v6_addr] if v6_addr else []),
-        "private_key": acct["private_key"],
-        "peers": [
-            {
-                "address": acct["endpoint"].split(":")[0],
-                "port": int(acct["endpoint"].split(":")[1]) if ":" in acct["endpoint"] else 2408,
-                "public_key": acct["peer_pub"],
-                "allowed_ips": ["0.0.0.0/0", "::/0"],
-                "persistent_keepalive_interval": 25
-            }
-        ],
-        "mtu": 1280,
-        "domain_strategy": "prefer_ipv4"
-    }
-    
-    # For Gool mode: add detour to upstream SOCKS (first hop)
-    if gool_mode and upstream_socks:
-        wg_endpoint["detour"] = "upstream-socks"
-        socks_parts = upstream_socks.split(":")
-        upstream_config = {
-            "type": "socks",
-            "tag": "upstream-socks",
-            "server": socks_parts[0],
-            "server_port": int(socks_parts[1]) if len(socks_parts) > 1 else 1080
-        }
-        extra_outbounds = [upstream_config]
-    else:
-        extra_outbounds = []
     
     return {
         "log": {"level": "warn"},
@@ -208,28 +168,118 @@ def singbox_warp_config(
                 **auth
             }
         ],
-        "endpoints": [wg_endpoint] + extra_outbounds,
+        "outbounds": [
+            {
+                "type": "wireguard",
+                "tag": "warp-inner",
+                "detour": "warp-outer",
+                "server": "162.159.192.1",
+                "server_port": 2408,
+                "local_address": [f"{inner_acct['v4']}/32"],
+                "private_key": inner_acct["private_key"],
+                "peer_public_key": inner_acct.get("peer_pub", "bmXOC+F1FxEMF9dyiK2H5/1SUtzH0JuVo51h2wPfgyo="),
+                "reserved": inner_acct.get("reserved", [0, 0, 0])
+            },
+            {
+                "type": "wireguard",
+                "tag": "warp-outer",
+                "server": "162.159.192.1",
+                "server_port": 2408,
+                "local_address": [f"{outer_acct['v4']}/32"],
+                "private_key": outer_acct["private_key"],
+                "peer_public_key": outer_acct.get("peer_pub", "bmXOC+F1FxEMF9dyiK2H5/1SUtzH0JuVo51h2wPfgyo="),
+                "reserved": outer_acct.get("reserved", [0, 0, 0]),
+                "noise": {
+                    "count": "2-4",
+                    "min_length": 40,
+                    "max_length": 100
+                }
+            }
+        ],
+        "route": {
+            "rules": [
+                {"outbound": "warp-inner"}
+            ]
+        }
+    }
+
+
+def singbox_warp_config(
+    acct: dict,
+    socks_port: int,
+    listen_host: str = "0.0.0.0",
+    username: str = "",
+    password: str = "",
+    gool_mode: bool = False,
+    upstream_socks: str = ""
+) -> dict:
+    """Build sing-box v1.14+ config for one WARP identity.
+    
+    DEPRECATED: Use singbox_warp_config_gool() for gool mode.
+    This function now only supports single-hop configurations.
+    """
+    if gool_mode:
+        raise ValueError("For gool mode, use singbox_warp_config_gool() with two accounts")
+    
+    auth = {}
+    if username:
+        auth = {"username": username, "password": password}
+    
+    v6_addr = f"{acct['v6']}/128" if acct.get("v6") else None
+    
+    return {
+        "log": {"level": "warn"},
+        "inbounds": [
+            {
+                "type": "socks",
+                "tag": "socks-in",
+                "listen": listen_host,
+                "listen_port": socks_port,
+                **auth
+            }
+        ],
+        "outbounds": [
+            {
+                "type": "wireguard",
+                "tag": "warp-egress",
+                "server": acct["endpoint"].split(":")[0],
+                "server_port": int(acct["endpoint"].split(":")[1]) if ":" in acct["endpoint"] else 2408,
+                "local_address": [acct["v4"] + "/32"] + ([v6_addr] if v6_addr else []),
+                "private_key": acct["private_key"],
+                "peer_public_key": acct.get("peer_pub", "bmXOC+F1FxEMF9dyiK2H5/1SUtzH0JuVo51h2wPfgyo="),
+                "reserved": acct.get("reserved", [0, 0, 0]),
+                "noise": {
+                    "count": "2-4",
+                    "min_length": 40,
+                    "max_length": 100
+                }
+            }
+        ],
         "route": {
             "rules": [
                 {"outbound": "warp-egress"}
             ]
-        },
-        "experimental": {
-            "cache_file": {"enabled": True}
         }
     }
 
 
 class SingboxWarpInstance:
-    """One sing-box process = one WARP identity = one SOCKS5 port."""
+    """One sing-box process = one WARP identity = one SOCKS5 port.
     
-    def __init__(self, idx: int, port: int, cfg, log):
+    For GOOL mode (double-hop): Uses singbox_warp_config_gool() to create
+    a single config with two WireGuard outbounds chained via detour.
+    This matches the user's warp-pro script exactly.
+    """
+    
+    def __init__(self, idx: int, port: int, cfg, log, gool_mode: bool = True):
         self.idx = idx
         self.port = port
         self.cfg = cfg
         self.log = log
+        self.gool_mode = gool_mode
         self.cache_dir = os.path.join(cfg.singwarp_state_dir(), f"inst{idx}")
-        self.acct: Optional[dict] = None
+        self.acct_outer: Optional[dict] = None
+        self.acct_inner: Optional[dict] = None
         self.proc: Optional[subprocess.Popen] = None
         self.egress_ip = ""
         self.latency_ms = 0
@@ -238,11 +288,11 @@ class SingboxWarpInstance:
         self.spawned_at = 0.0
         self._lock = threading.Lock()
     
-    def start(self, fresh_identity: bool = False, gool_mode: bool = False) -> bool:
+    def start(self, fresh_identity: bool = False) -> bool:
         """Spawn sing-box with a WARP config.
 
-        If fresh_identity=True, wipe cache -> auto-register new WARP account.
-        If gool_mode=True, enable double-hop (WARP-in-WARP) via detour chain.
+        If fresh_identity=True, wipe cache -> auto-register new WARP accounts.
+        If gool_mode=True, registers TWO accounts and chains them via detour.
         """
         if self.is_running():
             return True
@@ -253,85 +303,62 @@ class SingboxWarpInstance:
 
             os.makedirs(self.cache_dir, exist_ok=True)
 
-            # Register or load account
-            acct_path = os.path.join(self.cache_dir, "warp_acct.json")
-            if fresh_identity or not os.path.exists(acct_path):
+            # Register or load OUTER account (first hop)
+            acct_outer_path = os.path.join(self.cache_dir, "outer_acct.json")
+            if fresh_identity or not os.path.exists(acct_outer_path):
                 try:
-                    self.acct = register_warp_account()
-                    with open(acct_path, "w") as f:
-                        json.dump(self.acct, f, indent=2)
+                    self.acct_outer = register_warp_account()
+                    with open(acct_outer_path, "w") as f:
+                        json.dump(self.acct_outer, f, indent=2)
                 except Exception as e:
-                    self.failed_reason = f"registration: {e}"
+                    self.failed_reason = f"outer registration: {e}"
                     return False
             else:
-                with open(acct_path, "r") as f:
-                    self.acct = json.load(f)
+                with open(acct_outer_path, "r") as f:
+                    self.acct_outer = json.load(f)
 
-            # For gool mode: we need TWO identities and chain them
-            upstream_socks = ""
-            if gool_mode:
-                # Create secondary identity for first hop
-                secondary_cache = os.path.join(self.cache_dir, "secondary")
-                os.makedirs(secondary_cache, exist_ok=True)
-                secondary_acct_path = os.path.join(secondary_cache, "warp_acct.json")
-                
-                if not os.path.exists(secondary_acct_path):
+            # For gool mode: also need INNER account (second hop)
+            if self.gool_mode:
+                acct_inner_path = os.path.join(self.cache_dir, "inner_acct.json")
+                if fresh_identity or not os.path.exists(acct_inner_path):
                     try:
-                        secondary_acct = register_warp_account()
-                        with open(secondary_acct_path, "w") as f:
-                            json.dump(secondary_acct, f, indent=2)
+                        self.acct_inner = register_warp_account()
+                        with open(acct_inner_path, "w") as f:
+                            json.dump(self.acct_inner, f, indent=2)
                     except Exception as e:
-                        self.failed_reason = f"secondary registration: {e}"
+                        self.failed_reason = f"inner registration: {e}"
                         return False
                 else:
-                    with open(secondary_acct_path, "r") as f:
-                        secondary_acct = json.load(f)
-                
-                # First hop runs on upstream port
-                upstream_port = self.cfg.singwarp_upstream_base_port + self.idx
-                upstream_socks = f"127.0.0.1:{upstream_port}"
-                
-                # Start first hop (simple single-hop WARP)
-                first_hop_config = singbox_warp_config(
-                    secondary_acct,
-                    upstream_port,
-                    username="",
-                    password="",
-                    gool_mode=False,
-                    upstream_socks=""
-                )
-                first_hop_path = os.path.join(secondary_cache, "config.json")
-                with open(first_hop_path, "w") as f:
-                    json.dump(first_hop_config, f, indent=2)
-                
-                binpath = resolve_singbox_bin(self.cfg, self.log)
-                if not binpath:
-                    self.failed_reason = "sing-box binary not found"
-                    return False
-                
-                # Spawn first hop
-                self.proc_first = subprocess.Popen(
-                    [binpath, "run", "-c", first_hop_path],
-                    stdout=subprocess.DEVNULL,
-                    stderr=subprocess.DEVNULL,
-                    preexec_fn=SingboxWarpLane._pdeathsig
-                )
-                time.sleep(2)  # Give first hop time to handshake
+                    with open(acct_inner_path, "r") as f:
+                        self.acct_inner = json.load(f)
 
-            # Build and write main sing-box config (second hop in gool mode)
-            config = singbox_warp_config(
-                self.acct,
-                self.port,
-                username=self.cfg.singwarp_socks_username,
-                password=self.cfg.singwarp_socks_password,
-                gool_mode=gool_mode,
-                upstream_socks=upstream_socks
-            )
+            # Build config using the EXACT format from user's warp-pro script
+            if self.gool_mode and self.acct_outer and self.acct_inner:
+                config = singbox_warp_config_gool(
+                    self.acct_outer,
+                    self.acct_inner,
+                    self.port,
+                    listen_host="0.0.0.0",
+                    username=self.cfg.singwarp_socks_username,
+                    password=self.cfg.singwarp_socks_password
+                )
+            elif self.acct_outer:
+                # Single-hop mode
+                config = singbox_warp_config(
+                    self.acct_outer,
+                    self.port,
+                    listen_host="0.0.0.0",
+                    username=self.cfg.singwarp_socks_username,
+                    password=self.cfg.singwarp_socks_password
+                )
+            else:
+                self.failed_reason = "no account available"
+                return False
+
             config_path = os.path.join(self.cache_dir, "config.json")
             with open(config_path, "w") as f:
                 json.dump(config, f, indent=2)
 
-            # Spawn main sing-box process
             binpath = resolve_singbox_bin(self.cfg, self.log)
             if not binpath:
                 self.failed_reason = "sing-box binary not found"
@@ -341,15 +368,9 @@ class SingboxWarpInstance:
                 [binpath, "run", "-c", config_path],
                 stdout=subprocess.DEVNULL,
                 stderr=subprocess.DEVNULL,
-                preexec_fn=SingboxWarpLane._pdeathsig
+                preexec_fn=os.setsid
             )
             self.spawned_at = time.time()
-            self.gool_mode = gool_mode
-            return True
-
-        except Exception as e:
-            self.failed_reason = f"spawn: {e}"
-            return False
             return True
 
         except Exception as e:
