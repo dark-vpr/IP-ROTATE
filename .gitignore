@@ -8,39 +8,31 @@ __pycache__/
 env/
 venv/
 .venv/
-.ENV
-.ENV.local
 .env
 .env.local
-.env.
-*.env.*
-*.env.local.*
+.env.*
 
-# Testing
-.pytest_cache/
-.coverage
-coverage/
-htmlcov/
-
-# Build/dist
+# Build artifacts
 build/
 dist/
-*.egg
 *.egg-info/
-*.so
-*.whl
 
 # Logs
 *.log
 
-# OS
-.DS_Store
-Thumbs.db
+# Coverage
+.coverage
+coverage/
+htmlcov/
 
-# Editors
+# IDE
 .vscode/
 .idea/
 *.swp
 *.swo
 *.tmp
+
+# OS
+.DS_Store
+Thumbs.db
 ```
