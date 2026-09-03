@@ -231,6 +231,8 @@ class Config:
     singwarp_socks_password: str = ""
     singwarp_handshake_grace: float = 15.0  # grace for WireGuard handshake
     singwarp_probe_timeout: float = 15.0
+    singwarp_gool_mode: bool = False   # enable double-hop (WARP-in-WARP) like Oblivion's 'gool' method
+    singwarp_upstream_base_port: int = 46000  # base port for first-hop upstream SOCKS in gool mode
     singbox_bin: str = ""              # shared with v2ray lane (same binary)
 
     # --- metered free tiers (Webshare / scraping APIs) ------------------------

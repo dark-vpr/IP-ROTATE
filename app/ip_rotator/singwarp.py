@@ -141,20 +141,61 @@ def singbox_warp_config(
     socks_port: int,
     listen_host: str = "127.0.0.1",
     username: str = "",
-    password: str = ""
+    password: str = "",
+    gool_mode: bool = False,
+    upstream_socks: str = ""
 ) -> dict:
     """Build sing-box v1.14+ config for one WARP identity.
+    
+    Supports:
+      * Single-hop: Direct WireGuard -> Internet
+      * Double-hop (Gool): SOCKS upstream -> WireGuard Hop1 -> detour -> 
+        WireGuard Hop2 -> Internet (WARP-in-WARP)
     
     Key changes from old wireproxy/warp-plus configs:
       * WireGuard moved from outbounds to root-level `endpoints` block.
       * Peer details inside `peers: [...]` array under endpoint.
       * SOCKS inbound with optional auth at top level.
+      * Gool mode uses 'detour' field to chain WireGuard endpoints.
     """
     auth = {}
     if username:
         auth = {"username": username, "password": password}
     
     v6_addr = f"{acct['v6']}/128" if acct.get("v6") else None
+    
+    # Build WireGuard endpoint config
+    wg_endpoint = {
+        "type": "wireguard",
+        "tag": "warp-egress",
+        "address": [acct["v4"] + "/32"] + ([v6_addr] if v6_addr else []),
+        "private_key": acct["private_key"],
+        "peers": [
+            {
+                "address": acct["endpoint"].split(":")[0],
+                "port": int(acct["endpoint"].split(":")[1]) if ":" in acct["endpoint"] else 2408,
+                "public_key": acct["peer_pub"],
+                "allowed_ips": ["0.0.0.0/0", "::/0"],
+                "persistent_keepalive_interval": 25
+            }
+        ],
+        "mtu": 1280,
+        "domain_strategy": "prefer_ipv4"
+    }
+    
+    # For Gool mode: add detour to upstream SOCKS (first hop)
+    if gool_mode and upstream_socks:
+        wg_endpoint["detour"] = "upstream-socks"
+        socks_parts = upstream_socks.split(":")
+        upstream_config = {
+            "type": "socks",
+            "tag": "upstream-socks",
+            "server": socks_parts[0],
+            "server_port": int(socks_parts[1]) if len(socks_parts) > 1 else 1080
+        }
+        extra_outbounds = [upstream_config]
+    else:
+        extra_outbounds = []
     
     return {
         "log": {"level": "warn"},
@@ -167,25 +208,7 @@ def singbox_warp_config(
                 **auth
             }
         ],
-        "endpoints": [
-            {
-                "type": "wireguard",
-                "tag": "warp-egress",
-                "address": [acct["v4"] + "/32"] + ([v6_addr] if v6_addr else []),
-                "private_key": acct["private_key"],
-                "peers": [
-                    {
-                        "address": acct["endpoint"].split(":")[0],
-                        "port": int(acct["endpoint"].split(":")[1]) if ":" in acct["endpoint"] else 2408,
-                        "public_key": acct["peer_pub"],
-                        "allowed_ips": ["0.0.0.0/0", "::/0"],
-                        "persistent_keepalive_interval": 25
-                    }
-                ],
-                "mtu": 1280,
-                "domain_strategy": "prefer_ipv4"
-            }
-        ],
+        "endpoints": [wg_endpoint] + extra_outbounds,
         "route": {
             "rules": [
                 {"outbound": "warp-egress"}
@@ -215,20 +238,21 @@ class SingboxWarpInstance:
         self.spawned_at = 0.0
         self._lock = threading.Lock()
     
-    def start(self, fresh_identity: bool = False) -> bool:
+    def start(self, fresh_identity: bool = False, gool_mode: bool = False) -> bool:
         """Spawn sing-box with a WARP config.
-        
+
         If fresh_identity=True, wipe cache -> auto-register new WARP account.
+        If gool_mode=True, enable double-hop (WARP-in-WARP) via detour chain.
         """
         if self.is_running():
             return True
-        
+
         try:
             if fresh_identity:
                 shutil.rmtree(self.cache_dir, ignore_errors=True)
-            
+
             os.makedirs(self.cache_dir, exist_ok=True)
-            
+
             # Register or load account
             acct_path = os.path.join(self.cache_dir, "warp_acct.json")
             if fresh_identity or not os.path.exists(acct_path):
@@ -242,24 +266,77 @@ class SingboxWarpInstance:
             else:
                 with open(acct_path, "r") as f:
                     self.acct = json.load(f)
-            
-            # Build and write sing-box config
+
+            # For gool mode: we need TWO identities and chain them
+            upstream_socks = ""
+            if gool_mode:
+                # Create secondary identity for first hop
+                secondary_cache = os.path.join(self.cache_dir, "secondary")
+                os.makedirs(secondary_cache, exist_ok=True)
+                secondary_acct_path = os.path.join(secondary_cache, "warp_acct.json")
+                
+                if not os.path.exists(secondary_acct_path):
+                    try:
+                        secondary_acct = register_warp_account()
+                        with open(secondary_acct_path, "w") as f:
+                            json.dump(secondary_acct, f, indent=2)
+                    except Exception as e:
+                        self.failed_reason = f"secondary registration: {e}"
+                        return False
+                else:
+                    with open(secondary_acct_path, "r") as f:
+                        secondary_acct = json.load(f)
+                
+                # First hop runs on upstream port
+                upstream_port = self.cfg.singwarp_upstream_base_port + self.idx
+                upstream_socks = f"127.0.0.1:{upstream_port}"
+                
+                # Start first hop (simple single-hop WARP)
+                first_hop_config = singbox_warp_config(
+                    secondary_acct,
+                    upstream_port,
+                    username="",
+                    password="",
+                    gool_mode=False,
+                    upstream_socks=""
+                )
+                first_hop_path = os.path.join(secondary_cache, "config.json")
+                with open(first_hop_path, "w") as f:
+                    json.dump(first_hop_config, f, indent=2)
+                
+                binpath = resolve_singbox_bin(self.cfg, self.log)
+                if not binpath:
+                    self.failed_reason = "sing-box binary not found"
+                    return False
+                
+                # Spawn first hop
+                self.proc_first = subprocess.Popen(
+                    [binpath, "run", "-c", first_hop_path],
+                    stdout=subprocess.DEVNULL,
+                    stderr=subprocess.DEVNULL,
+                    preexec_fn=SingboxWarpLane._pdeathsig
+                )
+                time.sleep(2)  # Give first hop time to handshake
+
+            # Build and write main sing-box config (second hop in gool mode)
             config = singbox_warp_config(
                 self.acct,
                 self.port,
                 username=self.cfg.singwarp_socks_username,
-                password=self.cfg.singwarp_socks_password
+                password=self.cfg.singwarp_socks_password,
+                gool_mode=gool_mode,
+                upstream_socks=upstream_socks
             )
             config_path = os.path.join(self.cache_dir, "config.json")
             with open(config_path, "w") as f:
                 json.dump(config, f, indent=2)
-            
-            # Spawn sing-box
+
+            # Spawn main sing-box process
             binpath = resolve_singbox_bin(self.cfg, self.log)
             if not binpath:
                 self.failed_reason = "sing-box binary not found"
                 return False
-            
+
             self.proc = subprocess.Popen(
                 [binpath, "run", "-c", config_path],
                 stdout=subprocess.DEVNULL,
@@ -267,15 +344,21 @@ class SingboxWarpInstance:
                 preexec_fn=SingboxWarpLane._pdeathsig
             )
             self.spawned_at = time.time()
+            self.gool_mode = gool_mode
             return True
-            
+
         except Exception as e:
             self.failed_reason = f"spawn: {e}"
             return False
-    
+            return True
+
+        except Exception as e:
+            self.failed_reason = f"spawn: {e}"
+            return False
+
     def is_running(self) -> bool:
         return self.proc is not None and self.proc.poll() is None
-    
+
     def socks_ready(self, timeout: float = 8.0) -> bool:
         """Wait for SOCKS port to bind (proves sing-box started)."""
         deadline = time.monotonic() + timeout
@@ -289,6 +372,7 @@ class SingboxWarpInstance:
                     return False
                 time.sleep(0.3)
         return False
+
     
     def probe_egress(self, timeout: float = 15.0) -> Optional[str]:
         """Fetch egress IP through the WARP tunnel."""

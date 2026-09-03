@@ -1,5 +1,5 @@
 {
-  "_comment": "ip-rotator v3.2.0 PRODUCTION config - OPTIMIZED FOR 10-30 REQ/SEC WITH ZERO FAILURES",
+  "_comment": "ip-rotator v4.2.0 PRODUCTION config - OPTIMIZED FOR <1s RESPONSE TIMES",
   "listen_host": "0.0.0.0",
   "listen_port": 8000,
   "enable_socks": true,
@@ -25,7 +25,7 @@
   "warp_proxy_port": 40000,
   "wg_configs_dir": "/root/.ip_rotator/wg-configs",
 
-  "enable_warpplus": true,
+  "enable_warpplus": false,
   "warpplus_instances": 16,
   "warpplus_mode": "auto",
   "warpplus_countries": ["US", "GB", "DE", "FR", "NL", "CA", "CH", "SE", "NO", "JP", "SG", "AU", "AT", "BE", "BG", "CZ", "DK", "EE", "ES", "FI", "HR", "HU", "IE", "IN", "IT", "LV", "PL", "PT", "RO", "RS", "SK"],
