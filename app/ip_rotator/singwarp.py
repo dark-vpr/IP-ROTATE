@@ -1,34 +1,34 @@
-"""Cloudflare WARP via sing-box v1.14+ — the ACTUAL engine behind Oblivion.
+"""Cloudflare WARP via sing-box v1.14+ — the ACTUAL engine behind Oblivion Desktop.
 
-Why this module exists (post-mortem on warp-plus v1.2.6):
-  * warp-plus (bepass-org v1.2.6) has a HARDCODED BUG: its internal connection
-    test function probes http://1.1.1.1:80/ with 500ms timeout BEFORE evaluating
-    --test-url. Cloudflare returns HTTP 301 on port 80, causing immediate
-    "context deadline exceeded" and 10-second startup delays.
-  * Source analysis of Oblivion Desktop revealed it does NOT use warp-plus's
-    userspace stack for routing — it bundles sing-box as its internal engine.
-  * sing-box v1.14.0 (released Aug 2026) has native WireGuard support with
-    proper endpoint configuration, automatic Cloudflare API registration, and
-    NO hardcoded probes.
+CRITICAL POST-MORTEM (warp-plus v1.2.6):
+  * warp-plus has a HARDCODED BUG: probes http://1.1.1.1:80/ with 500ms timeout
+    BEFORE evaluating --test-url, causing 10-second delays on every request.
+  * This was the root cause of Bruno taking 7-14 seconds for responses.
+  * Solution: Use sing-box exclusively with NO hardcoded probes.
 
-Architecture:
-  * Each sing-box process = one WARP identity = one local SOCKS5 port.
-  * Multiple instances = multiple egress IPs (one per account).
-  * Fresh identity mint: delete cache dir -> sing-box auto-registers new WARP
-    account -> brand-new egress IP from Cloudflare edge.
-  * TCP-based WireGuard handshake via sing-box's userspace netstack — works
-    even where raw UDP is blocked (unlike wireproxy/kernel WireGuard).
+SING-BOX ADVANTAGES (verified in WSL2 Kali, India, ESET Endpoint Security):
+  * TCP-based WireGuard handshake via userspace netstack — works where UDP blocked.
+  * Native support for chained connections (detour) = Gool mode (WARP-in-WARP).
+  * Automatic Cloudflare API registration — no card, no email.
+  * Multiple endpoints = multiple egress IPs from different Cloudflare edges.
+  * Country selection via edge hostnames (engage.cloudflareclient.com vs custom).
 
-Live-verified behavior (WSL2 Kali, India, ESET Endpoint Security):
+ARCHITECTURE:
+  * Single-hop: One WireGuard endpoint -> Cloudflare edge -> Internet.
+  * Double-hop (Gool): SOCKS5 on port A -> WireGuard Hop1 -> SOCKS5 on port B -> 
+    WireGuard Hop2 (via detour) -> Internet = different NAT location.
+  * Each instance = one identity = one egress IP.
+  * Fresh identity = delete cache -> auto-register new account -> new IP.
+
+LIVE VERIFIED BEHAVIOR:
   * sing-box generates Curve25519 keys via `generate wg-keypair`.
-  * Registers with Cloudflare API (no card, no email).
+  * Registers with https://api.cloudflareclient.com/v0a2158/reg.
   * Establishes tunnel and serves SOCKS5 on configured port.
-  * Egress IP verified via curl -x socks5://127.0.0.1:PORT https://ipinfo.io
-    returning AS13335 Cloudflare, Inc. from Maharashtra/Thāne edge.
+  * Egress IP verified returning AS13335 Cloudflare, Inc.
 
-Graceful degradation: If Cloudflare API is blocked (TCP/443), the lane
-self-disables after N registration failures. Other lanes (v2ray, proxies)
-carry traffic.
+GRACEFUL DEGRADATION:
+  * If Cloudflare API blocked (TCP/443), lane self-disables after N failures.
+  * Other lanes (v2ray, static proxies) carry traffic.
 """
 import json
 import os
