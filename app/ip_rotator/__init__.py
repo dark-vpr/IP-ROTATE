@@ -1,6 +1,6 @@
-"""IP Rotator v4.0.0 - Production Ready with Advanced WAF Bypass."""
+"""IP Rotator v4.1.0 - Production Ready with Advanced WAF Bypass."""
 
-__version__ = "4.0.0"
+__version__ = "4.1.0"
 __all__ = [
     "httpkit",
     "wafbypass", 

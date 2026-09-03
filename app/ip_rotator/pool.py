@@ -42,6 +42,7 @@ from .providers import (PsiphonProvider, WarpProvider, WindscribeProxyProvider,
 from .state import StateDB
 from .v2raylane import V2RayLane
 from .warpwire import WarpPlusLane, WireGuardLane
+from .singwarp import SingboxWarpLane
 
 
 def _proto_for_source(url: str) -> str:
@@ -143,6 +144,7 @@ class PoolManager:
         self.wg = WireGuardLane(cfg, log, state)
         self.warpplus = WarpPlusLane(cfg, log, state)
         self.v2ray = V2RayLane(cfg, log, state)
+        self.singwarp = SingboxWarpLane(cfg, log, state)
         self._warp_checked = False
         self._webshare_next_refresh = 0.0
         self._api_bytes_lock = threading.Lock()
@@ -204,6 +206,13 @@ class PoolManager:
                 f"v2ray free-node lane: up to {self.cfg.v2ray_max_nodes} "
                 f"warm community nodes via sing-box — TCP protocols work "
                 "even where UDP is blocked")
+        if self.singwarp.enabled():
+            self.singwarp.start()
+            self.log.warning(
+                f"sing-warp lane: {self.cfg.singwarp_instances} WARP instances "
+                f"via sing-box v1.14+ — NO hardcoded probes (unlike warp-plus), "
+                f"fast startup, TCP-based WireGuard handshake works where UDP "
+                f"is blocked, fresh identity mint = new Cloudflare egress IP")
         threading.Thread(target=self._wg_refresh_loop, name="wg-refresh",
                          daemon=True).start()
 
@@ -216,6 +225,7 @@ class PoolManager:
         self.wg.stop()
         self.warpplus.stop()
         self.v2ray.stop()
+        self.singwarp.stop()
         try:
             self._flush_api_bytes()
         except Exception:
@@ -273,6 +283,12 @@ class PoolManager:
                 for u in self.warpplus.validated_upstreams():
                     with self._lock:
                         self._wg_upstreams[u.label] = u
+                # sing-warp lane (v4): Cloudflare WARP via sing-box v1.14+
+                # This is the ACTUAL engine behind Oblivion Desktop — NO
+                # hardcoded HTTP probes, fast startup, TCP-based handshake
+                for u in self.singwarp.validated_upstreams():
+                    with self._lock:
+                        self._wg_upstreams[u.label] = u
                 # windscribe proxy mode lane (opt-in): a single local SOCKS
                 # upstream whose egress changes when we rotate the location
                 if self.cfg.enable_windscribe_proxy and \
@@ -297,7 +313,7 @@ class PoolManager:
         src = u.source or ""
         return (src.startswith("wg:") or src.startswith("webshare") or
                 src.startswith("v2ray:") or src.startswith("warpplus:") or
-                src == "windscribe-proxy")
+                src.startswith("singwarp:") or src == "windscribe-proxy")
 
     def _candidates_locked(self) -> List[Upstream]:
         return list(self._validated.values()) + \

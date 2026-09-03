@@ -31,6 +31,12 @@
   "warpplus_countries": ["US", "GB", "DE", "FR", "NL", "CA", "CH", "SE", "NO", "JP", "SG", "AU", "AT", "BE", "BG", "CZ", "DK", "EE", "ES", "FI", "HR", "HU", "IE", "IN", "IT", "LV", "PL", "PT", "RO", "RS", "SK"],
   "warpplus_max_instances": 32,
 
+  "enable_singwarp": true,
+  "singwarp_instances": 8,
+  "singwarp_socks_base_port": 45000,
+  "singwarp_handshake_grace": 15.0,
+  "singwarp_probe_timeout": 15.0,
+
   "enable_v2ray": true,
   "v2ray_max_nodes": 300,
   "v2ray_socks_base_port": 43000,

@@ -48,7 +48,7 @@ COPY --from=ghcr.io/astral-sh/uv:0.12.5 /uv /usr/local/bin/uv
 #     purpose: app edits don't invalidate the binary downloads ---------------
 ARG WIREPROXY_URL=https://github.com/pufferffish/wireproxy/releases/latest/download/wireproxy_linux_amd64.tar.gz
 ARG WARPPLUS_URL=https://github.com/bepass-org/warp-plus/releases/latest/download/warp-plus_linux-amd64.zip
-ARG SINGBOX_URL=https://github.com/SagerNet/sing-box/releases/download/v1.13.19/sing-box-1.13.19-linux-amd64.tar.gz
+ARG SINGBOX_URL=https://github.com/SagerNet/sing-box/releases/download/v1.14.0/sing-box-1.14.0-linux-amd64.tar.gz
 RUN set -eux; \
     mkdir -p /tmp/bin && cd /tmp/bin; \
     curl -fsSL "$WIREPROXY_URL" | tar xz; \
