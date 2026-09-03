@@ -1,6 +1,6 @@
 [project]
 name = "ip-rotator"
-version = "4.0.0"
+version = "4.1.0"
 description = "Ultimate IP Rotator with God Mode WAF Bypass"
 requires-python = ">=3.12"
 dependencies = [
@@ -13,6 +13,7 @@ dependencies = [
     "pytest>=8.3.0",
     "websockets>=14.0",
     "pysocks>=1.7.1",
+    "python-socks>=2.5.0",
     "cryptography>=44.0.0",
 ]
 
