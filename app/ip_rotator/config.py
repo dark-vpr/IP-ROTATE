@@ -204,7 +204,7 @@ class Config:
                                        # download from singbox_download
     singbox_download: str = "https://github.com/SagerNet/sing-box/" \
                            "releases/download/v1.14.0/" \
-                           "sing-box-1.14.0-linux-amd64.tar.gz"
+                           "sing-box-1.14.0-linux-amd64-glibc.tar.gz"
     v2ray_socks_base_port: int = 43000
     v2ray_max_nodes: int = 240         # max outbounds per sing-box process
     v2ray_min_warm: int = 8            # regen config when healthy < this
