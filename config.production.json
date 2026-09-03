@@ -34,6 +34,8 @@
   "enable_singwarp": true,
   "singwarp_instances": 8,
   "singwarp_socks_base_port": 45000,
+  "singwarp_gool_mode": true,
+  "singwarp_upstream_base_port": 46000,
   "singwarp_handshake_grace": 15.0,
   "singwarp_probe_timeout": 15.0,
 

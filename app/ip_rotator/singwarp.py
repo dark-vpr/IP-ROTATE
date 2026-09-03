@@ -523,7 +523,8 @@ class SingboxWarpLane:
                         i,
                         self.cfg.singwarp_socks_base_port + i,
                         self.cfg,
-                        self.log
+                        self.log,
+                        gool_mode=self.cfg.singwarp_gool_mode
                     ))
             
             for inst in self.instances[len(wanted):]:
