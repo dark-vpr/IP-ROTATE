@@ -13,7 +13,7 @@ env/
 .env.local
 .env.*
 
-# Logs
+# Logs and temporary files
 *.log
 
 # Coverage
