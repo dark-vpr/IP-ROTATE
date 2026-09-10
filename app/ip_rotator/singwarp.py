@@ -31,6 +31,7 @@ GRACEFUL DEGRADATION:
   * Other lanes (v2ray, static proxies) carry traffic.
 """
 import json
+import logging
 import os
 import random
 import shutil
@@ -39,10 +40,15 @@ import subprocess
 import stat
 import threading
 import time
+from datetime import datetime, timezone
 from typing import Dict, List, Optional
+
+import aiohttp
 
 from .dialer import Upstream, fetch_egress_ip
 from .httpkit import http_client
+
+logger = logging.getLogger(__name__)
 
 
 # Cloudflare WARP registration API (same endpoint warp-plus uses)
