@@ -32,6 +32,7 @@ GRACEFUL DEGRADATION:
 """
 import json
 import os
+import random
 import shutil
 import socket
 import subprocess
@@ -83,8 +84,12 @@ def x25519_keypair() -> tuple[str, str]:
     return pub, base64.b64encode(der[-32:]).decode()
 
 
-def register_warp_account(timeout: float = 20.0) -> dict:
-    """Register one FREE WARP account; returns fields sing-box needs."""
+def register_warp_account(timeout: float = 20.0, max_retries: int = 5) -> dict:
+    """Register one FREE WARP account with exponential backoff for rate limits.
+    
+    CRITICAL: Cloudflare API often returns 429 when registering multiple accounts.
+    This function implements exponential backoff to handle rate limiting gracefully.
+    """
     import base64
     pub, priv = x25519_keypair()
     
@@ -97,43 +102,66 @@ def register_warp_account(timeout: float = 20.0) -> dict:
         "serial_number": os.urandom(4).hex(),
     }).encode()
     
-    r = http_client().post(
-        CF_REG,
-        content=body,
-        timeout=timeout,
-        headers={
-            "Content-Type": "application/json",
-            "User-Agent": "Mozilla/5.0 (X11; Linux x86_64) "
-                         "AppleWebKit/537.36"
-        }
-    )
+    for attempt in range(max_retries):
+        try:
+            r = http_client().post(
+                CF_REG,
+                content=body,
+                timeout=timeout,
+                headers={
+                    "Content-Type": "application/json",
+                    "User-Agent": "Mozilla/5.0 (X11; Linux x86_64) "
+                                 "AppleWebKit/537.36"
+                }
+            )
+            
+            if r.status_code == 429:
+                # Rate limited - exponential backoff with jitter
+                wait_time = (2 ** attempt) + random.uniform(0.5, 1.5)
+                logger.warning(
+                    f"WARP registration rate limited (429). "
+                    f"Waiting {wait_time:.1f}s before retry {attempt+1}/{max_retries}..."
+                )
+                time.sleep(wait_time)
+                continue
+            elif r.status_code in (200, 201):
+                data = r.json()
+                cfg = data.get("config") or {}
+                peers = cfg.get("peers") or []
+                addr = (cfg.get("interface") or {}).get("addresses") or {}
+                
+                if not peers or not addr.get("v4"):
+                    raise OSError("WARP registration response missing config fields")
+                
+                peer = peers[0]
+                endpoint_host = (peer.get("endpoint") or {}).get(
+                    "host", "engage.cloudflareclient.com:2408"
+                )
+                
+                return {
+                    "registered_at": time.time(),
+                    "private_key": priv,
+                    "v4": addr["v4"],
+                    "v6": addr.get("v6", ""),
+                    "peer_pub": peer.get("public_key") or WARP_PEER_PUB,
+                    "endpoint": endpoint_host,
+                }
+            else:
+                raise OSError(
+                    f"WARP registration HTTP {r.status_code}: {r.text[:120]}"
+                )
+                
+        except Exception as e:
+            if attempt == max_retries - 1:
+                raise
+            wait_time = (2 ** attempt) + random.uniform(0.5, 1.5)
+            logger.warning(
+                f"WARP registration attempt {attempt+1} failed: {e}. "
+                f"Retrying in {wait_time:.1f}s..."
+            )
+            time.sleep(wait_time)
     
-    if r.status_code not in (200, 201):
-        raise OSError(
-            f"WARP registration HTTP {r.status_code}: {r.text[:120]}"
-        )
-    
-    data = r.json()
-    cfg = data.get("config") or {}
-    peers = cfg.get("peers") or []
-    addr = (cfg.get("interface") or {}).get("addresses") or {}
-    
-    if not peers or not addr.get("v4"):
-        raise OSError("WARP registration response missing config fields")
-    
-    peer = peers[0]
-    endpoint_host = (peer.get("endpoint") or {}).get(
-        "host", "engage.cloudflareclient.com:2408"
-    )
-    
-    return {
-        "registered_at": time.time(),
-        "private_key": priv,
-        "v4": addr["v4"],
-        "v6": addr.get("v6", ""),
-        "peer_pub": peer.get("public_key") or WARP_PEER_PUB,
-        "endpoint": endpoint_host,
-    }
+    raise OSError(f"WARP registration failed after {max_retries} attempts")
 
 
 def singbox_warp_config_gool(
@@ -303,11 +331,14 @@ class SingboxWarpInstance:
 
             os.makedirs(self.cache_dir, exist_ok=True)
 
-            # Register or load OUTER account (first hop)
+            # Register or load OUTER account (first hop) with rate limit handling
             acct_outer_path = os.path.join(self.cache_dir, "outer_acct.json")
             if fresh_identity or not os.path.exists(acct_outer_path):
                 try:
-                    self.acct_outer = register_warp_account()
+                    self.acct_outer = register_warp_account(
+                        timeout=self.cfg.singwarp_probe_timeout,
+                        max_retries=self.cfg.singwarp_max_retries
+                    )
                     with open(acct_outer_path, "w") as f:
                         json.dump(self.acct_outer, f, indent=2)
                 except Exception as e:
@@ -322,7 +353,10 @@ class SingboxWarpInstance:
                 acct_inner_path = os.path.join(self.cache_dir, "inner_acct.json")
                 if fresh_identity or not os.path.exists(acct_inner_path):
                     try:
-                        self.acct_inner = register_warp_account()
+                        self.acct_inner = register_warp_account(
+                            timeout=self.cfg.singwarp_probe_timeout,
+                            max_retries=self.cfg.singwarp_max_retries
+                        )
                         with open(acct_inner_path, "w") as f:
                             json.dump(self.acct_inner, f, indent=2)
                     except Exception as e:

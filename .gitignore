@@ -5,32 +5,30 @@ __pycache__/
 *.pyo
 *.pyd
 
-# Environment
+# Dependencies
+.venv/
+venv/
+env/
 .env
 .env.local
-*.env.*
+.env.*
 
 # Logs
 *.log
-
-# Temporary files
-*.tmp
-*.swp
-*.swo
 
 # Coverage
 .coverage
 coverage/
 htmlcov/
 
-# MyPy
-.mypy_cache/
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*.tmp
 
-# Pytest
-.pytest_cache/
-
-# Distribution / packaging
-dist/
-build/
-*.egg-info/
+# OS
+.DS_Store
+Thumbs.db
 ```
