@@ -233,6 +233,7 @@ class Config:
     singwarp_probe_timeout: float = 15.0
     singwarp_gool_mode: bool = False   # enable double-hop (WARP-in-WARP) like Oblivion's 'gool' method
     singwarp_upstream_base_port: int = 46000  # base port for first-hop upstream SOCKS in gool mode
+    singwarp_max_retries: int = 5      # max retries for WARP registration (429 rate limits)
     singbox_bin: str = ""              # shared with v2ray lane (same binary)
     
     # --- WAF validation engine (v5): Multi-vendor consensus -------------------
